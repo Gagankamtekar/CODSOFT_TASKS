@@ -33,11 +33,9 @@ export function loadTasks(key) {
   data.forEach((item) => {
     if (!item || typeof item !== 'object') return
 
-    // A task must have a title. Skip it if the title is missing or empty.
     const title = typeof item.title === 'string' ? item.title.trim() : ''
     if (!title) return
 
-    // Keep the saved id if it is usable and unique, otherwise create a new one
     let id = (typeof item.id === 'string' || typeof item.id === 'number')
       ? item.id
       : crypto.randomUUID()
@@ -53,6 +51,7 @@ export function loadTasks(key) {
       dueDate: typeof item.dueDate === 'string' && DATE_PATTERN.test(item.dueDate)
         ? item.dueDate
         : '',
+      snoozedUntil: typeof item.snoozedUntil === 'number' ? item.snoozedUntil : null,
     })
   })
 
