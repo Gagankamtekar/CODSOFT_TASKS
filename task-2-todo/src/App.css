@@ -479,6 +479,39 @@ button:focus-visible {
   color: var(--muted);
 }
 
+/* ---------- Reminders ---------- */
+.reminder-panel { border-left: 4px solid #f59e0b; }
+.reminder-heading { margin: 0 0 0.75rem; font-size: 1.1rem; }
+.reminder-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.6rem; }
+
+.reminder {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  background: #fffbeb;
+}
+.reminder-overdue  { background: #fef2f2; border-left: 3px solid #ef4444; }
+.reminder-today    { background: #fff7ed; border-left: 3px solid #f59e0b; }
+.reminder-tomorrow { background: #eff6ff; border-left: 3px solid #3b82f6; }
+
+.reminder-info { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.reminder-actions { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+.reminder-actions button { padding: 0.3rem 0.6rem; font-size: 0.8rem; }
+.reminder-actions .snooze-btn { background: transparent; border: 1px solid currentColor; }
+
+body.dark .reminder          { background: rgba(255, 255, 255, 0.05); }
+body.dark .reminder-overdue  { background: rgba(239, 68, 68, 0.15); }
+body.dark .reminder-today    { background: rgba(245, 158, 11, 0.15); }
+body.dark .reminder-tomorrow { background: rgba(59, 130, 246, 0.15); }
+
+/* ---------- Notifications ---------- */
+.notify-row { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+.hint { font-size: 0.85rem; opacity: 0.8; margin: 0.5rem 0 0; }
+
 /* ============ RESPONSIVE ============ */
 @media (max-width: 900px) {
   .split { grid-template-columns: 1fr; }
