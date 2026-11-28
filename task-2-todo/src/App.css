@@ -602,3 +602,6 @@ body.dark .cal-cell.other { opacity: 0.35; }
 body.dark button {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 }
+/* ---------- Due-now reminders and time tags ---------- */
+.reminder-now { background: #fef3c7; border-left: 3px solid #d97706; }
+body.dark .reminder-now { background: rgba(217, 119, 6, 0.2); }
