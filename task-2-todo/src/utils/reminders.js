@@ -14,10 +14,14 @@ export const SNOOZE_OPTIONS = [
   { label: '1 day', ms: 24 * 60 * 60 * 1000 },
 ]
 
-// Groups open tasks into overdue / due today / due tomorrow.
+// Groups open tasks into:
+//   now      = due today and its time has arrived
+//   overdue  = due before today
+//   today    = due today, no time yet or time still ahead
+//   tomorrow = due tomorrow
 // Completed and currently snoozed tasks are left out.
-export function getReminders(tasks, { todayISO, nowMs = Date.now() }) {
-  const result = { overdue: [], today: [], tomorrow: [] }
+export function getReminders(tasks, { todayISO, nowMs = Date.now(), nowTime = '' }) {
+  const result = { now: [], overdue: [], today: [], tomorrow: [] }
   if (!Array.isArray(tasks) || !todayISO) return result
 
   const tomorrowISO = shiftISO(todayISO, 1)
@@ -26,9 +30,15 @@ export function getReminders(tasks, { todayISO, nowMs = Date.now() }) {
     if (!task || task.completed || !task.dueDate) continue
     if (task.snoozedUntil && task.snoozedUntil > nowMs) continue
 
-    if (task.dueDate < todayISO) result.overdue.push(task)
-    else if (task.dueDate === todayISO) result.today.push(task)
-    else if (task.dueDate === tomorrowISO) result.tomorrow.push(task)
+    if (task.dueDate < todayISO) {
+      result.overdue.push(task)
+    } else if (task.dueDate === todayISO) {
+      // "HH:MM" strings compare correctly as text
+      if (task.dueTime && nowTime && task.dueTime <= nowTime) result.now.push(task)
+      else result.today.push(task)
+    } else if (task.dueDate === tomorrowISO) {
+      result.tomorrow.push(task)
+    }
   }
   return result
 }
