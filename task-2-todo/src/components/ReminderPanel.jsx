@@ -1,21 +1,21 @@
 import { SNOOZE_OPTIONS } from '../utils/reminders'
 
 const LABELS = {
+  now: 'Due now',
   overdue: 'Overdue',
   today: 'Due today',
   tomorrow: 'Due tomorrow',
 }
 
 export default function ReminderPanel({ reminders, onSnooze, onComplete }) {
-  const overdue = reminders?.overdue ?? []
-  const today = reminders?.today ?? []
-  const tomorrow = reminders?.tomorrow ?? []
-
-  const items = [
-    ...overdue.map(t => ({ task: t, kind: 'overdue' })),
-    ...today.map(t => ({ task: t, kind: 'today' })),
-    ...tomorrow.map(t => ({ task: t, kind: 'tomorrow' })),
+  const groups = [
+    ['now', reminders?.now ?? []],
+    ['overdue', reminders?.overdue ?? []],
+    ['today', reminders?.today ?? []],
+    ['tomorrow', reminders?.tomorrow ?? []],
   ]
+
+  const items = groups.flatMap(([kind, list]) => list.map(task => ({ task, kind })))
 
   if (items.length === 0) return null
 
@@ -28,7 +28,10 @@ export default function ReminderPanel({ reminders, onSnooze, onComplete }) {
           <li key={task.id} className={`reminder reminder-${kind}`}>
             <div className="reminder-info">
               <strong>{task.title}</strong>
-              <span className={`tag ${kind === 'overdue' ? 'overdue' : ''}`}>{LABELS[kind]}</span>
+              <span className={`tag ${kind === 'overdue' || kind === 'now' ? 'overdue' : ''}`}>
+                {LABELS[kind]}
+              </span>
+              {task.dueTime && <span className="tag">⏰ {task.dueTime}</span>}
             </div>
 
             <div className="reminder-actions">
