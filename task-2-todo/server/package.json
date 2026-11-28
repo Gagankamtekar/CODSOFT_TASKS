@@ -1,0 +1,14 @@
+{
+  "name": "todo-push-server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --env-file=.env index.js",
+    "dev": "node --env-file=.env --watch index.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "web-push": "^3.6.7"
+  }
+}
