@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { validateTask, TITLE_MAX } from '../utils/validation'
-import { toISO } from '../utils/dates'
+import { toISO, toHM } from '../utils/dates'
 
-const EMPTY_FORM = { title: '', category: 'Personal', priority: 'Medium', dueDate: '' }
+const EMPTY_FORM = { title: '', category: 'Personal', priority: 'Medium', dueDate: '', dueTime: '' }
 
 export default function TaskForm({ onAdd, existingTitles = [] }) {
   const [form, setForm] = useState(EMPTY_FORM)
@@ -10,17 +10,25 @@ export default function TaskForm({ onAdd, existingTitles = [] }) {
 
   const handleChange = (e) => {
     const { name, value } = e.target
-    setForm(prev => ({ ...prev, [name]: value }))
+    setForm(prev => {
+      const next = { ...prev, [name]: value }
+      // Clearing the date also clears the time
+      if (name === 'dueDate' && !value) next.dueTime = ''
+      return next
+    })
     setError('')
   }
 
   const handleSubmit = (e) => {
     e.preventDefault()
+    const now = new Date()
     const validationError = validateTask({
       title: form.title,
       dueDate: form.dueDate,
+      dueTime: form.dueTime,
       existingTitles,
-      today: toISO(new Date()),
+      today: toISO(now),
+      nowTime: toHM(now),
     })
     if (validationError) {
       setError(validationError)
@@ -32,6 +40,7 @@ export default function TaskForm({ onAdd, existingTitles = [] }) {
       category: form.category,
       priority: form.priority,
       dueDate: form.dueDate,
+      dueTime: form.dueTime,
     })
     setForm(EMPTY_FORM)
     setError('')
@@ -70,6 +79,14 @@ export default function TaskForm({ onAdd, existingTitles = [] }) {
           value={form.dueDate}
           onChange={handleChange}
           aria-label="Due date"
+        />
+        <input
+          type="time"
+          name="dueTime"
+          value={form.dueTime}
+          onChange={handleChange}
+          disabled={!form.dueDate}
+          aria-label="Due time"
         />
       </div>
 
