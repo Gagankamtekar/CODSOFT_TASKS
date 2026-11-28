@@ -1,17 +1,20 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import './App.css'
 import TaskForm from './components/TaskForm'
 import TaskItem from './components/TaskItem'
 import CalendarView from './components/CalendarView'
 import ReminderPanel from './components/ReminderPanel'
 import NotificationSettings from './components/NotificationSettings'
+import SoundSettings from './components/SoundSettings'
 import { loadTasks } from './utils/storage'
 import { getReminders } from './utils/reminders'
 import { getCurrentSubscription, syncTasks } from './utils/push'
-import { toISO } from './utils/dates'
+import { playChime } from './utils/sound'
+import { toISO, toHM } from './utils/dates'
 
 const STORAGE_KEY = 'todo-tasks'
 const THEME_KEY = 'todo-theme'
+const SOUND_KEY = 'todo-sound'
 
 function App() {
   const [tasks, setTasks] = useState(() => loadTasks(STORAGE_KEY))
@@ -22,38 +25,42 @@ function App() {
 
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem(THEME_KEY) === 'dark')
 
+  // Reminder sound is on unless the user turned it off
+  const [soundOn, setSoundOn] = useState(() => localStorage.getItem(SOUND_KEY) !== 'off')
+
   // Current time, refreshed every 30 seconds so reminders and snoozes update
   const [now, setNow] = useState(() => Date.now())
 
   // This browser's push subscription (null when notifications are off)
   const [subscription, setSubscription] = useState(null)
 
-  // Save tasks whenever they change
+  // Keys of the reminders shown last time, used to detect new ones
+  const prevKeysRef = useRef(null)
+
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks))
   }, [tasks])
 
-  // Dark mode: add/remove the "dark" class on <body>
   useEffect(() => {
     document.body.classList.toggle('dark', darkMode)
     localStorage.setItem(THEME_KEY, darkMode ? 'dark' : 'light')
   }, [darkMode])
 
-  // Tick the clock
+  useEffect(() => {
+    localStorage.setItem(SOUND_KEY, soundOn ? 'on' : 'off')
+  }, [soundOn])
+
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 30 * 1000)
     return () => clearInterval(id)
   }, [])
 
-  // On load, pick up a subscription that already exists.
-  // Errors are caught so a missing service worker never blocks the UI.
   useEffect(() => {
     getCurrentSubscription()
       .then(setSubscription)
       .catch(() => setSubscription(null))
   }, [])
 
-  // Whenever tasks change and notifications are on, send a copy to the server
   useEffect(() => {
     if (!subscription) return
     syncTasks(subscription, tasks).catch(err => console.error('Could not sync tasks', err))
@@ -74,7 +81,34 @@ function App() {
   const snoozeTask = (id, ms) => updateTask(id, { snoozedUntil: Date.now() + ms })
   const completeTask = (id) => updateTask(id, { completed: true, snoozedUntil: null })
 
-  const reminders = getReminders(tasks, { todayISO: toISO(new Date(now)), nowMs: now })
+  const current = new Date(now)
+  const reminders = getReminders(tasks, {
+    todayISO: toISO(current),
+    nowMs: now,
+    nowTime: toHM(current),
+  })
+
+  // One key per visible reminder, e.g. "task-id:now"
+  const reminderKeys = [
+    ...reminders.now.map(t => `${t.id}:now`),
+    ...reminders.overdue.map(t => `${t.id}:overdue`),
+    ...reminders.today.map(t => `${t.id}:today`),
+    ...reminders.tomorrow.map(t => `${t.id}:tomorrow`),
+  ]
+  const reminderKeyString = reminderKeys.join('|')
+
+  // Play the chime when a reminder appears that wasn't shown before
+  useEffect(() => {
+    const prev = prevKeysRef.current
+    prevKeysRef.current = reminderKeys
+
+    // First load: don't ring for reminders that already existed
+    if (prev === null) return
+
+    const hasNew = reminderKeys.some(key => !prev.includes(key))
+    if (hasNew && soundOn) playChime()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reminderKeyString, soundOn])
 
   const visibleTasks = tasks.filter(t =>
     t.title.toLowerCase().includes(search.toLowerCase()) &&
@@ -111,6 +145,10 @@ function App() {
 
             <section className="card">
               <NotificationSettings subscription={subscription} onChange={setSubscription} />
+            </section>
+
+            <section className="card">
+              <SoundSettings soundOn={soundOn} onChange={setSoundOn} />
             </section>
 
             <section className="card">
