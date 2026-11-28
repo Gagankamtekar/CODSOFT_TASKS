@@ -3,22 +3,30 @@ import './App.css'
 import TaskForm from './components/TaskForm'
 import TaskItem from './components/TaskItem'
 import CalendarView from './components/CalendarView'
+import ReminderPanel from './components/ReminderPanel'
+import NotificationSettings from './components/NotificationSettings'
 import { loadTasks } from './utils/storage'
+import { getReminders } from './utils/reminders'
+import { getCurrentSubscription, syncTasks } from './utils/push'
+import { toISO } from './utils/dates'
 
 const STORAGE_KEY = 'todo-tasks'
 const THEME_KEY = 'todo-theme'
 
 function App() {
-  // Load tasks from Local Storage safely
   const [tasks, setTasks] = useState(() => loadTasks(STORAGE_KEY))
 
-  // Search and filter state
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [categoryFilter, setCategoryFilter] = useState('all')
 
-  // Dark mode state (remembered in Local Storage)
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem(THEME_KEY) === 'dark')
+
+  // Current time, refreshed every 30 seconds so reminders and snoozes update
+  const [now, setNow] = useState(() => Date.now())
+
+  // This browser's push subscription (null when notifications are off)
+  const [subscription, setSubscription] = useState(null)
 
   // Save tasks whenever they change
   useEffect(() => {
@@ -31,30 +39,49 @@ function App() {
     localStorage.setItem(THEME_KEY, darkMode ? 'dark' : 'light')
   }, [darkMode])
 
-  // Add a task with a unique ID and a safe functional update
-  const addTask = (newTask) =>
-    setTasks(prev => [{ id: crypto.randomUUID(), completed: false, ...newTask }, ...prev])
+  // Tick the clock
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30 * 1000)
+    return () => clearInterval(id)
+  }, [])
 
-  // Complete / pending
+  // On load, pick up a subscription that already exists.
+  // Errors are caught so a missing service worker never blocks the UI.
+  useEffect(() => {
+    getCurrentSubscription()
+      .then(setSubscription)
+      .catch(() => setSubscription(null))
+  }, [])
+
+  // Whenever tasks change and notifications are on, send a copy to the server
+  useEffect(() => {
+    if (!subscription) return
+    syncTasks(subscription, tasks).catch(err => console.error('Could not sync tasks', err))
+  }, [subscription, tasks])
+
+  const addTask = (newTask) =>
+    setTasks(prev => [{ id: crypto.randomUUID(), completed: false, snoozedUntil: null, ...newTask }, ...prev])
+
   const toggleTask = (id) =>
     setTasks(prev => prev.map(t => (t.id === id ? { ...t, completed: !t.completed } : t)))
 
-  // Edit
   const updateTask = (id, changes) =>
     setTasks(prev => prev.map(t => (t.id === id ? { ...t, ...changes } : t)))
 
-  // Delete
   const deleteTask = (id) =>
     setTasks(prev => prev.filter(t => t.id !== id))
 
-  // Apply search and filters
+  const snoozeTask = (id, ms) => updateTask(id, { snoozedUntil: Date.now() + ms })
+  const completeTask = (id) => updateTask(id, { completed: true, snoozedUntil: null })
+
+  const reminders = getReminders(tasks, { todayISO: toISO(new Date(now)), nowMs: now })
+
   const visibleTasks = tasks.filter(t =>
     t.title.toLowerCase().includes(search.toLowerCase()) &&
     (statusFilter === 'all' || (statusFilter === 'completed' ? t.completed : !t.completed)) &&
     (categoryFilter === 'all' || t.category === categoryFilter)
   )
 
-  // Counts
   const completedCount = tasks.filter(t => t.completed).length
   const pendingCount = tasks.length - completedCount
 
@@ -69,15 +96,23 @@ function App() {
 
       <main className="container wide">
         <div className="split">
-          {/* LEFT: Calendar */}
           <div className="split-left">
             <section className="card">
               <CalendarView tasks={tasks} onToggle={toggleTask} />
             </section>
           </div>
 
-          {/* RIGHT: Form, stats, and list */}
           <div className="split-right">
+            <ReminderPanel
+              reminders={reminders}
+              onSnooze={snoozeTask}
+              onComplete={completeTask}
+            />
+
+            <section className="card">
+              <NotificationSettings subscription={subscription} onChange={setSubscription} />
+            </section>
+
             <section className="card">
               <TaskForm
                 onAdd={addTask}
