@@ -13,6 +13,9 @@ self.addEventListener('push', event => {
     self.registration.showNotification(data.title, {
       body: data.body,
       tag: data.tag,
+      renotify: true,        // alert again even when replacing an existing notification
+      silent: false,         // let the operating system play its notification sound
+      vibrate: [200, 100, 200],
       icon: '/favicon.svg',
       data: { url: data.url },
     })
