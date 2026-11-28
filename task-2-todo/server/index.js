@@ -1,4 +1,3 @@
-// server/index.js
 import express from 'express'
 import cors from 'cors'
 import webpush from 'web-push'
@@ -39,16 +38,19 @@ function sanitizeTasks(tasks) {
     id: String(t.id),
     title: String(t.title ?? '').slice(0, 100),
     dueDate: typeof t.dueDate === 'string' ? t.dueDate : '',
+    dueTime: typeof t.dueTime === 'string' ? t.dueTime : '',
     completed: t.completed === true,
     snoozedUntil: typeof t.snoozedUntil === 'number' ? t.snoozedUntil : null,
   }))
 }
 
 function messageFor(task, kind) {
+  const timeText = task.dueTime ? ` at ${task.dueTime}` : ''
   const messages = {
+    now: ['🔔 Task due now', `"${task.title}" is due${timeText}.`],
     overdue: ['⚠️ Overdue task', `"${task.title}" was due ${task.dueDate}.`],
-    today: ['📅 Due today', `"${task.title}" is due today.`],
-    tomorrow: ['⏰ Due tomorrow', `"${task.title}" is due tomorrow.`],
+    today: ['📅 Due today', `"${task.title}" is due today${timeText}.`],
+    tomorrow: ['⏰ Due tomorrow', `"${task.title}" is due tomorrow${timeText}.`],
   }
   const [title, body] = messages[kind]
   return { title, body, tag: `${task.id}-${kind}`, url: '/' }
@@ -62,7 +64,10 @@ app.get('/api/push/public-key', (req, res) => {
   res.json({ key: VAPID_PUBLIC_KEY })
 })
 
-// Called on subscribe and whenever the tasks change (upsert)
+app.get('/api/health', (req, res) => {
+  res.json({ ok: true })
+})
+
 app.post('/api/push/subscribe', (req, res) => {
   const { subscription, tzAhead = 0, tasks } = req.body ?? {}
   if (!subscription?.endpoint) return res.status(400).json({ error: 'Missing subscription' })
@@ -72,7 +77,7 @@ app.post('/api/push/subscribe', (req, res) => {
     subscription,
     tzAhead: Number(tzAhead) || 0,
     tasks: sanitizeTasks(tasks),
-    sent: existing?.sent ?? {},   // remember what was already sent
+    sent: existing?.sent ?? {},
   }
   save()
   res.json({ ok: true })
@@ -85,7 +90,6 @@ app.post('/api/push/unsubscribe', (req, res) => {
   res.json({ ok: true })
 })
 
-// Runs every minute and sends any reminders that are due
 async function checkReminders() {
   const nowMs = Date.now()
 
@@ -93,9 +97,14 @@ async function checkReminders() {
     const local = new Date(nowMs + entry.tzAhead * 60 * 1000)
     const todayISO = local.toISOString().slice(0, 10)
     const hour = local.getUTCHours()
+    const nowTime = `${String(local.getUTCHours()).padStart(2, '0')}:${String(local.getUTCMinutes()).padStart(2, '0')}`
 
-    const reminders = getReminders(entry.tasks, { todayISO, nowMs })
+    const reminders = getReminders(entry.tasks, { todayISO, nowMs, nowTime })
     const due = []
+
+    // "Due now" fires at the task's time, whatever the hour
+    reminders.now.forEach(t => due.push([t, 'now']))
+
     if (hour >= DAILY_HOUR) {
       reminders.overdue.forEach(t => due.push([t, 'overdue']))
       reminders.today.forEach(t => due.push([t, 'today']))
@@ -105,15 +114,14 @@ async function checkReminders() {
     }
 
     for (const [task, kind] of due) {
-      // Including snoozedUntil means each snooze gets its own notification when it ends
+      // Including the snooze time means each snooze gets its own notification
       const key = `${todayISO}:${task.id}:${kind}:${task.snoozedUntil ?? 0}`
-      if (entry.sent[key]) continue // already sent for this snooze
+      if (entry.sent[key]) continue
 
       try {
         await webpush.sendNotification(entry.subscription, JSON.stringify(messageFor(task, kind)))
         entry.sent[key] = true
       } catch (err) {
-        // 404 or 410 means the browser removed this subscription
         if (err.statusCode === 404 || err.statusCode === 410) {
           delete db.subscriptions[endpoint]
           break
@@ -122,7 +130,6 @@ async function checkReminders() {
       }
     }
 
-    // Drop sent-markers from previous days
     if (db.subscriptions[endpoint]) {
       for (const k of Object.keys(entry.sent)) {
         if (!k.startsWith(todayISO)) delete entry.sent[k]
