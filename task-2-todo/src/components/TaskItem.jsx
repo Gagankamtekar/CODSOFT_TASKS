@@ -1,17 +1,22 @@
 import { useState } from 'react'
 import { validateTask, TITLE_MAX } from '../utils/validation'
-import { toISO } from '../utils/dates'
+import { toISO, toHM } from '../utils/dates'
 
 export default function TaskItem({ task, existingTitles = [], onToggle, onUpdate, onDelete }) {
   const [editing, setEditing] = useState(false)
   const [editError, setEditError] = useState('')
-  const [draft, setDraft] = useState({ title: '', category: 'Personal', priority: 'Medium', dueDate: '' })
+  const [draft, setDraft] = useState({ title: '', category: 'Personal', priority: 'Medium', dueDate: '', dueTime: '' })
 
-  const today = toISO(new Date())
+  const now = new Date()
+  const today = toISO(now)
   const isOverdue = Boolean(task.dueDate) && !task.completed && task.dueDate < today
 
   const updateDraft = (field, value) => {
-    setDraft(prev => ({ ...prev, [field]: value }))
+    setDraft(prev => {
+      const next = { ...prev, [field]: value }
+      if (field === 'dueDate' && !value) next.dueTime = ''
+      return next
+    })
     setEditError('')
   }
 
@@ -21,6 +26,7 @@ export default function TaskItem({ task, existingTitles = [], onToggle, onUpdate
       category: task.category,
       priority: task.priority,
       dueDate: task.dueDate || '',
+      dueTime: task.dueTime || '',
     })
     setEditError('')
     setEditing(true)
@@ -35,9 +41,12 @@ export default function TaskItem({ task, existingTitles = [], onToggle, onUpdate
     const error = validateTask({
       title: draft.title,
       dueDate: draft.dueDate,
-      existingTitles, // other tasks' titles, not this task's own
+      dueTime: draft.dueTime,
+      existingTitles,
       today,
+      nowTime: toHM(now),
       originalDueDate: task.dueDate,
+      originalDueTime: task.dueTime || '',
     })
     if (error) {
       setEditError(error)
@@ -48,6 +57,7 @@ export default function TaskItem({ task, existingTitles = [], onToggle, onUpdate
       category: draft.category,
       priority: draft.priority,
       dueDate: draft.dueDate,
+      dueTime: draft.dueTime,
     })
     setEditing(false)
     setEditError('')
@@ -67,6 +77,9 @@ export default function TaskItem({ task, existingTitles = [], onToggle, onUpdate
       <span className="tag">{task.priority}</span>
       {task.dueDate && (
         <span className={`tag ${isOverdue ? 'overdue' : ''}`}>📅 {task.dueDate}</span>
+      )}
+      {task.dueDate && task.dueTime && (
+        <span className="tag">⏰ {task.dueTime}</span>
       )}
     </div>
   )
@@ -122,6 +135,14 @@ export default function TaskItem({ task, existingTitles = [], onToggle, onUpdate
                 aria-label="Edit due date"
                 value={draft.dueDate}
                 onChange={(e) => updateDraft('dueDate', e.target.value)}
+              />
+
+              <input
+                type="time"
+                aria-label="Edit due time"
+                value={draft.dueTime}
+                disabled={!draft.dueDate}
+                onChange={(e) => updateDraft('dueTime', e.target.value)}
               />
             </div>
 
