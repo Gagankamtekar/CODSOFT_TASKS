@@ -1,6 +1,7 @@
 const CATEGORIES = ['Work', 'Personal', 'Study']
 const PRIORITIES = ['Low', 'Medium', 'High']
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
+const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/
 
 // Loads tasks from Local Storage and repairs anything that is missing or broken
 export function loadTasks(key) {
@@ -42,14 +43,20 @@ export function loadTasks(key) {
     if (usedIds.has(id)) id = crypto.randomUUID()
     usedIds.add(id)
 
+    const dueDate = typeof item.dueDate === 'string' && DATE_PATTERN.test(item.dueDate)
+      ? item.dueDate
+      : ''
+
     tasks.push({
       id,
       title,
       completed: item.completed === true,
       category: CATEGORIES.includes(item.category) ? item.category : 'Personal',
       priority: PRIORITIES.includes(item.priority) ? item.priority : 'Medium',
-      dueDate: typeof item.dueDate === 'string' && DATE_PATTERN.test(item.dueDate)
-        ? item.dueDate
+      dueDate,
+      // A time only makes sense with a date
+      dueTime: dueDate && typeof item.dueTime === 'string' && TIME_PATTERN.test(item.dueTime)
+        ? item.dueTime
         : '',
       snoozedUntil: typeof item.snoozedUntil === 'number' ? item.snoozedUntil : null,
     })
