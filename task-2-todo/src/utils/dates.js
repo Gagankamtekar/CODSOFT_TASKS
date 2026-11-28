@@ -5,7 +5,10 @@ export function toISO(date) {
   const d = String(date.getDate()).padStart(2, '0')
   return `${y}-${m}-${d}`
 }
-
+// Converts a Date to "HH:MM" (24-hour local time)
+export function toHM(date) {
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}
 // Adds a number of days to a date
 export function addDays(date, n) {
   const copy = new Date(date)
